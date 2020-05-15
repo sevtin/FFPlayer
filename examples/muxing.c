@@ -110,7 +110,7 @@ static void add_stream(OutputStream *ost, AVFormatContext *oc,
     int i;
 
     /* find the encoder */
-    /* 通过codec_id找到编码器。 */
+    /* 通过codec_id找到编码器。 AVCodec *avcodec_find_encoder(enum AVCodecID id); */
     *codec = avcodec_find_encoder(codec_id);
     if (!(*codec)) {
         fprintf(stderr, "Could not find encoder for '%s'\n",
@@ -118,13 +118,15 @@ static void add_stream(OutputStream *ost, AVFormatContext *oc,
         exit(1);
     }
     /* avformat_new_stream() 是AVStream的初始化函数 */
+    /* AVStream *avformat_new_stream(AVFormatContext *s, const AVCodec *c); */
     ost->st = avformat_new_stream(oc, NULL);
     if (!ost->st) {
         fprintf(stderr, "Could not allocate stream\n");
         exit(1);
     }
+    /* oc->nb_streams:AVFormatContext.streams中的元素数。 */
     ost->st->id = oc->nb_streams-1;
-    /* avcodec_alloc_context3()初始化AVStream中的AVCodecContext。*/
+    /* avcodec_alloc_context3()初始化AVStream中的AVCodecContext。 AVCodecContext *avcodec_alloc_context3(const AVCodec *codec);*/
     c = avcodec_alloc_context3(*codec);
     if (!c) {
         fprintf(stderr, "Could not alloc an encoding context\n");
@@ -135,10 +137,10 @@ static void add_stream(OutputStream *ost, AVFormatContext *oc,
     switch ((*codec)->type) {
     case AVMEDIA_TYPE_AUDIO://音频。
         c->sample_fmt  = (*codec)->sample_fmts ?
-            (*codec)->sample_fmts[0] : AV_SAMPLE_FMT_FLTP;
+            (*codec)->sample_fmts[0] : AV_SAMPLE_FMT_FLTP;//采样率
         c->bit_rate    = 64000;//码流
         c->sample_rate = 44100;//抽样率，样本率，采样速度 44.1K
-        if ((*codec)->supported_samplerates) {
+        if ((*codec)->supported_samplerates) {//supported_samplerates:支持的采样率（仅音频）
             c->sample_rate = (*codec)->supported_samplerates[0];
             for (i = 0; (*codec)->supported_samplerates[i]; i++) {
                 if ((*codec)->supported_samplerates[i] == 44100)
@@ -259,9 +261,11 @@ static void open_audio(AVFormatContext *oc, AVCodec *codec, OutputStream *ost, A
     }
 
     /* init signal generator */
+    /* 初始化信号发生器 */
     ost->t     = 0;
     ost->tincr = 2 * M_PI * 110.0 / c->sample_rate;
     /* increment frequency by 110 Hz per second */
+    /* 每秒增加110 Hz的频率 */
     ost->tincr2 = 2 * M_PI * 110.0 / c->sample_rate / c->sample_rate;
 
     if (c->codec->capabilities & AV_CODEC_CAP_VARIABLE_FRAME_SIZE)
@@ -441,9 +445,11 @@ static void open_video(AVFormatContext *oc, AVCodec *codec, OutputStream *ost, A
     AVCodecContext *c = ost->enc;
     AVDictionary *opt = NULL;
 
+    /* 将条目从一个字典拷贝到另一个字典 opt_arg->opt */
     av_dict_copy(&opt, opt_arg, 0);
 
     /* open the codec */
+    /* int avcodec_open2(AVCodecContext *avctx, const AVCodec *codec, AVDictionary **options) */
     ret = avcodec_open2(c, codec, &opt);
     av_dict_free(&opt);
     if (ret < 0) {
@@ -452,6 +458,7 @@ static void open_video(AVFormatContext *oc, AVCodec *codec, OutputStream *ost, A
     }
 
     /* allocate and init a re-usable frame */
+    /* 分配并初始化可重用框架 */
     ost->frame = alloc_picture(c->pix_fmt, c->width, c->height);
     if (!ost->frame) {
         fprintf(stderr, "Could not allocate video frame\n");
@@ -461,6 +468,9 @@ static void open_video(AVFormatContext *oc, AVCodec *codec, OutputStream *ost, A
     /* If the output format is not YUV420P, then a temporary YUV420P
      * picture is needed too. It is then converted to the required
      * output format. */
+    /* 如果输出格式不是YUV420P，则为临时YUV420P
+     * 也需要图片。然后将其转换为所需的
+     * 输出格式。 */
     ost->tmp_frame = NULL;
     if (c->pix_fmt != AV_PIX_FMT_YUV420P) {
         ost->tmp_frame = alloc_picture(AV_PIX_FMT_YUV420P, c->width, c->height);
@@ -471,6 +481,7 @@ static void open_video(AVFormatContext *oc, AVCodec *codec, OutputStream *ost, A
     }
 
     /* copy the stream parameters to the muxer */
+    /* 将流参数复制到复用器 */
     ret = avcodec_parameters_from_context(ost->st->codecpar, c);
     if (ret < 0) {
         fprintf(stderr, "Could not copy the stream parameters\n");
@@ -479,6 +490,7 @@ static void open_video(AVFormatContext *oc, AVCodec *codec, OutputStream *ost, A
 }
 
 /* Prepare a dummy image. */
+/* 准备虚拟图像 */
 static void fill_yuv_image(AVFrame *pict, int frame_index,
                            int width, int height)
 {
@@ -505,7 +517,7 @@ static AVFrame *get_video_frame(OutputStream *ost)
 {
     AVCodecContext *c = ost->enc;
 
-    /* check if we want to generate more frames */
+    /* check if we want to generate more frames 检查我们是否要生成更多帧 */
     /*
      比较当前时间是否是否大于设定时间 next_pts*time_base > STREAM_DURATION*1
      相当于只产生10s的视频
@@ -524,6 +536,8 @@ static AVFrame *get_video_frame(OutputStream *ost)
     if (c->pix_fmt != AV_PIX_FMT_YUV420P) {
         /* as we only generate a YUV420P picture, we must convert it
          * to the codec pixel format if needed */
+        /* 因为我们只生成YUV420P图片，所以我们必须对其进行转换
+        到编解码器像素格式（如果需要）*/
         if (!ost->sws_ctx) {
             ost->sws_ctx = sws_getContext(c->width, c->height,
                                           AV_PIX_FMT_YUV420P,
@@ -643,6 +657,10 @@ int main(int argc, char **argv)
 
     /* allocate the output media context */
     /* 该函数通常是第一个调用的函数，函数可以初始化一个用于输出的AVFormatContext结构体 */
+    /*
+     int avformat_alloc_output_context2(AVFormatContext **ctx, ff_const59 AVOutputFormat *oformat,
+     const char *format_name, const char *filename);
+     */
     avformat_alloc_output_context2(&oc, NULL, NULL, filename);
     if (!oc) {
         /* 无法从文件扩展名推断输出格式：则使用MPEG */
@@ -745,3 +763,39 @@ int main(int argc, char **argv)
 
     return 0;
 }
+
+/*
+ 一：与运算符（&）
+ 预算规则：
+
+ 0&0=0；0&1=0；1&0=0；1&1=1
+
+ 即：两个同时为1，结果为1，否则为0
+
+ 例如：3&5
+
+ 十进制3转为二进制的3：0000 0011
+
+ 十进制5转为二进制的5：0000 0101
+
+ ------------------------结果：0000 0001 ->转为十进制：1
+
+ 即：3&5 = 1
+
+ 二：或运算（|）
+ 运算规则：
+
+ 0|0=0；  0|1=1；  1|0=1；   1|1=1；
+
+ 即 ：参加运算的两个对象，一个为1，其值为1。
+
+ 例如：3|5　即 00000011 | 0000 0101 = 00000111，因此，3|5=7。
+
+ 三：异或运算符（^）
+ 运算规则：0^0=0；  0^1=1；  1^0=1；   1^1=0；
+
+ 即：参加运算的两个对象，如果两个位为“异”（值不同），则该位结果为1，否则为0。
+
+ 例如：3^5 =  0000 0011 | 0000 0101 =0000 0110，因此，3^5 = 6
+
+ */
