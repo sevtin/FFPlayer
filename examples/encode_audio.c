@@ -131,22 +131,26 @@ int main(int argc, char **argv)
     FILE *f;
     uint16_t *samples;
     float t, tincr;
-
+    
+    /*
     if (argc <= 1) {
         fprintf(stderr, "Usage: %s <output file>\n", argv[0]);
         return 0;
     }
     filename = argv[1];
+    */
+    filename = "Sandwich.mp4";
 
-    /* find the MP2 encoder */
+    /* find the MP2 encoder 1、查找编码器*/
     codec = avcodec_find_encoder(AV_CODEC_ID_MP2);
     if (!codec) {
         fprintf(stderr, "Codec not found\n");
         exit(1);
     }
-
+    /* 初始化编码器上下文 */
     c = avcodec_alloc_context3(codec);
     if (!c) {
+        /* 无法分配音频编解码器上下文 */
         fprintf(stderr, "Could not allocate audio codec context\n");
         exit(1);
     }
