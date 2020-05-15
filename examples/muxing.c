@@ -50,11 +50,13 @@
 #define SCALE_FLAGS SWS_BICUBIC
 
 // a wrapper around a single output AVStream
+// 单个输出AVStream的包装器
 typedef struct OutputStream {
     AVStream *st;
     AVCodecContext *enc;
 
     /* pts of the next frame that will be generated */
+    /* 将要生成的下一帧的点数 */
     int64_t next_pts;
     int samples_count;
 
@@ -90,6 +92,7 @@ static int write_frame(AVFormatContext *fmt_ctx, const AVRational *time_base, AV
     pkt->stream_index = st->index;
 
     /* Write the compressed frame to the media file. */
+    /* 将压缩的帧写入媒体文件。 */
     log_packet(fmt_ctx, pkt);
     /* 数据写入封装（缓存几帧自动识别dts写入）
      再将数据通过av_interleaved_write_frame写入到容器中。
@@ -114,13 +117,14 @@ static void add_stream(OutputStream *ost, AVFormatContext *oc,
                 avcodec_get_name(codec_id));
         exit(1);
     }
-
+    /* avformat_new_stream() 是AVStream的初始化函数 */
     ost->st = avformat_new_stream(oc, NULL);
     if (!ost->st) {
         fprintf(stderr, "Could not allocate stream\n");
         exit(1);
     }
     ost->st->id = oc->nb_streams-1;
+    /* avcodec_alloc_context3()初始化AVStream中的AVCodecContext。*/
     c = avcodec_alloc_context3(*codec);
     if (!c) {
         fprintf(stderr, "Could not alloc an encoding context\n");
@@ -133,7 +137,7 @@ static void add_stream(OutputStream *ost, AVFormatContext *oc,
         c->sample_fmt  = (*codec)->sample_fmts ?
             (*codec)->sample_fmts[0] : AV_SAMPLE_FMT_FLTP;
         c->bit_rate    = 64000;//码流
-        c->sample_rate = 44100;
+        c->sample_rate = 44100;//抽样率，样本率，采样速度 44.1K
         if ((*codec)->supported_samplerates) {
             c->sample_rate = (*codec)->supported_samplerates[0];
             for (i = 0; (*codec)->supported_samplerates[i]; i++) {
@@ -141,7 +145,9 @@ static void add_stream(OutputStream *ost, AVFormatContext *oc,
                     c->sample_rate = 44100;
             }
         }
+        /* 根据通道的layout返回通道的个数 */
         c->channels        = av_get_channel_layout_nb_channels(c->channel_layout);
+        /* AV_CH_LAYOUT_STEREO 双声道*/
         c->channel_layout = AV_CH_LAYOUT_STEREO;
         if ((*codec)->channel_layouts) {
             c->channel_layout = (*codec)->channel_layouts[0];
@@ -151,6 +157,7 @@ static void add_stream(OutputStream *ost, AVFormatContext *oc,
             }
         }
         c->channels        = av_get_channel_layout_nb_channels(c->channel_layout);
+        /* time_base。它也是用来度量时间的。 如果把1秒分为25等份，你可以理解就是一把尺，那么每一格表示的就是1/25秒。此时的time_base={1，25} 如果你是把1秒分成90000份，每一个刻度就是1/90000秒，此时的time_base={1，90000} */
         ost->st->time_base = (AVRational){ 1, c->sample_rate };
         break;
 
@@ -165,19 +172,26 @@ static void add_stream(OutputStream *ost, AVFormatContext *oc,
          * of which frame timestamps are represented. For fixed-fps content,
          * timebase should be 1/framerate and timestamp increments should be
          * identical to 1. */
+        /* 时基：这是时间的基本单位（以秒为单位）
+         * 表示其中的帧时间戳。对于固定fps内容，
+         * 时基应为1 / framerate，时间戳增量应为
+         * 等于1。*/
         ost->st->time_base = (AVRational){ 1, STREAM_FRAME_RATE };
         c->time_base       = ost->st->time_base;
 
-        c->gop_size      = 12; /* emit one intra frame every twelve frames at most */
+        c->gop_size      = 12; /* emit one intra frame every twelve frames at most */ /*每12帧产生一个关键帧*/
         c->pix_fmt       = STREAM_PIX_FMT;//规定视频编码的方式为YUV420;可以见define定义。
         if (c->codec_id == AV_CODEC_ID_MPEG2VIDEO) {
-            /* just for testing, we also add B-frames */
+            /* just for testing, we also add B-frames */ /* 只是为了测试，我们还添加了B帧 : 两个非B帧之间的B帧的最大数目*/
             c->max_b_frames = 2;
         }
         if (c->codec_id == AV_CODEC_ID_MPEG1VIDEO) {
             /* Needed to avoid using macroblocks in which some coeffs overflow.
              * This does not happen with normal video, it just happens here as
              * the motion of the chroma plane does not match the luma plane. */
+            /*需要避免使用某些系数溢出的宏块。
+             *这在普通视频中不会发生，只是在这里
+             *色度平面的运动与亮度平面不匹配。 */
             c->mb_decision = 2;
         }
     break;
@@ -187,6 +201,7 @@ static void add_stream(OutputStream *ost, AVFormatContext *oc,
     }
 
     /* Some formats want stream headers to be separate. */
+    /* 某些格式希望流头分开。*/
     if (oc->oformat->flags & AVFMT_GLOBALHEADER)
         c->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 }
@@ -206,12 +221,13 @@ static AVFrame *alloc_audio_frame(enum AVSampleFormat sample_fmt,
         exit(1);
     }
 
-    frame->format = sample_fmt;
+    frame->format = sample_fmt;//8 bits,16 bits,32 bits
     frame->channel_layout = channel_layout;//声道数
     frame->sample_rate = sample_rate;//采样率
     frame->nb_samples = nb_samples;//音频的一个AVFrame中可能包含多个音频帧，在此标记包含了几个
 
     if (nb_samples) {
+        /* 分配新的缓冲区以存储音频或视频数据 */
         ret = av_frame_get_buffer(frame, 0);
         if (ret < 0) {
             fprintf(stderr, "Error allocating an audio buffer\n");
@@ -233,6 +249,7 @@ static void open_audio(AVFormatContext *oc, AVCodec *codec, OutputStream *ost, A
     c = ost->enc;
 
     /* open it */
+    /* 将条目从一个AVDictionary结构复制到另一个。 */
     av_dict_copy(&opt, opt_arg, 0);
     ret = avcodec_open2(c, codec, &opt);
     av_dict_free(&opt);
@@ -258,6 +275,7 @@ static void open_audio(AVFormatContext *oc, AVCodec *codec, OutputStream *ost, A
                                        c->sample_rate, nb_samples);
 
     /* copy the stream parameters to the muxer */
+    /* 将流参数复制到复用器 */
     ret = avcodec_parameters_from_context(ost->st->codecpar, c);
     if (ret < 0) {
         fprintf(stderr, "Could not copy the stream parameters\n");
@@ -265,6 +283,7 @@ static void open_audio(AVFormatContext *oc, AVCodec *codec, OutputStream *ost, A
     }
 
     /* create resampler context */
+    /* 创建重采样器上下文 */
         ost->swr_ctx = swr_alloc();
         if (!ost->swr_ctx) {
             fprintf(stderr, "Could not allocate resampler context\n");
@@ -329,7 +348,7 @@ static int write_audio_frame(AVFormatContext *oc, OutputStream *ost)
     int ret;
     int got_packet;
     int dst_nb_samples;
-
+    
     av_init_packet(&pkt);
     c = ost->enc;
     /* 获取音频帧 */
@@ -338,6 +357,8 @@ static int write_audio_frame(AVFormatContext *oc, OutputStream *ost)
     if (frame) {
         /* convert samples from native format to destination codec format, using the resampler */
             /* compute destination number of samples */
+        /*使用重采样器将样本从本机格式转换为目标编解码器格式 */
+            /* 计算样本的目标数量 */
             dst_nb_samples = av_rescale_rnd(swr_get_delay(ost->swr_ctx, c->sample_rate) + frame->nb_samples,
                                             c->sample_rate, c->sample_rate, AV_ROUND_UP);
             av_assert0(dst_nb_samples == frame->nb_samples);
@@ -346,6 +367,7 @@ static int write_audio_frame(AVFormatContext *oc, OutputStream *ost)
          * internally;
          * make sure we do not overwrite it here
          */
+        /* 确保帧数据可写，并尽可能避免复制数据。 */
         ret = av_frame_make_writable(ost->frame);
         if (ret < 0)
             exit(1);
@@ -397,11 +419,12 @@ static AVFrame *alloc_picture(enum AVPixelFormat pix_fmt, int width, int height)
     if (!picture)
         return NULL;
 
-    picture->format = pix_fmt;
+    picture->format = pix_fmt;//像素格式。
     picture->width  = width;
     picture->height = height;
 
     /* allocate the buffers for the frame data */
+    /* 为帧数据分配缓冲区 */
     ret = av_frame_get_buffer(picture, 32);
     if (ret < 0) {
         fprintf(stderr, "Could not allocate frame data.\n");
