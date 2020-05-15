@@ -28,7 +28,7 @@
  * codecs are used.
  * @example muxing.c
  */
-
+/* https://blog.csdn.net/quange_style/article/details/90078628 注释参考*/
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -43,7 +43,7 @@
 #include <libswscale/swscale.h>
 #include <libswresample/swresample.h>
 
-#define STREAM_DURATION   10.0
+#define STREAM_DURATION   10.0/* 视频流时长。。以秒计数。*/
 #define STREAM_FRAME_RATE 25 /* 25 images/s */
 #define STREAM_PIX_FMT    AV_PIX_FMT_YUV420P /* default pix_fmt */
 
@@ -78,18 +78,27 @@ static void log_packet(const AVFormatContext *fmt_ctx, const AVPacket *pkt)
            pkt->stream_index);
 }
 
+/* 将数据写入封装器 */
 static int write_frame(AVFormatContext *fmt_ctx, const AVRational *time_base, AVStream *st, AVPacket *pkt)
 {
     /* rescale output packet timestamp values from codec to stream timebase */
+    /* 编码器时间转换，将时间戳由编码器时基AVCodecContext.time_base 转化为流的时基AVStream.time_base
+     在编码后pkt.pts、pkt.dts使用AVCodecContext->time_base为单位，需要调用该接口，将时基转换为流时基st->time_base(在本例子中初始化ost->st->time_base = (AVRational){ 1, c->sample_rate }，根据不同容器情况来看)
+     
+     */
     av_packet_rescale_ts(pkt, *time_base, st->time_base);
     pkt->stream_index = st->index;
 
     /* Write the compressed frame to the media file. */
     log_packet(fmt_ctx, pkt);
+    /* 数据写入封装（缓存几帧自动识别dts写入）
+     再将数据通过av_interleaved_write_frame写入到容器中。
+     */
     return av_interleaved_write_frame(fmt_ctx, pkt);
 }
 
 /* Add an output stream. */
+/* 这里做的操作其实就是指定了视频编码器和音频编码器的参数 */
 static void add_stream(OutputStream *ost, AVFormatContext *oc,
                        AVCodec **codec,
                        enum AVCodecID codec_id)
@@ -98,6 +107,7 @@ static void add_stream(OutputStream *ost, AVFormatContext *oc,
     int i;
 
     /* find the encoder */
+    /* 通过codec_id找到编码器。 */
     *codec = avcodec_find_encoder(codec_id);
     if (!(*codec)) {
         fprintf(stderr, "Could not find encoder for '%s'\n",
@@ -119,10 +129,10 @@ static void add_stream(OutputStream *ost, AVFormatContext *oc,
     ost->enc = c;
 
     switch ((*codec)->type) {
-    case AVMEDIA_TYPE_AUDIO:
+    case AVMEDIA_TYPE_AUDIO://音频。
         c->sample_fmt  = (*codec)->sample_fmts ?
             (*codec)->sample_fmts[0] : AV_SAMPLE_FMT_FLTP;
-        c->bit_rate    = 64000;
+        c->bit_rate    = 64000;//码流
         c->sample_rate = 44100;
         if ((*codec)->supported_samplerates) {
             c->sample_rate = (*codec)->supported_samplerates[0];
@@ -144,12 +154,12 @@ static void add_stream(OutputStream *ost, AVFormatContext *oc,
         ost->st->time_base = (AVRational){ 1, c->sample_rate };
         break;
 
-    case AVMEDIA_TYPE_VIDEO:
-        c->codec_id = codec_id;
+    case AVMEDIA_TYPE_VIDEO://视频。
+        c->codec_id = codec_id;//编解码器的id
 
         c->bit_rate = 400000;
         /* Resolution must be a multiple of two. */
-        c->width    = 352;
+        c->width    = 352;//视频的宽高。
         c->height   = 288;
         /* timebase: This is the fundamental unit of time (in seconds) in terms
          * of which frame timestamps are represented. For fixed-fps content,
@@ -159,7 +169,7 @@ static void add_stream(OutputStream *ost, AVFormatContext *oc,
         c->time_base       = ost->st->time_base;
 
         c->gop_size      = 12; /* emit one intra frame every twelve frames at most */
-        c->pix_fmt       = STREAM_PIX_FMT;
+        c->pix_fmt       = STREAM_PIX_FMT;//规定视频编码的方式为YUV420;可以见define定义。
         if (c->codec_id == AV_CODEC_ID_MPEG2VIDEO) {
             /* just for testing, we also add B-frames */
             c->max_b_frames = 2;
@@ -212,6 +222,7 @@ static AVFrame *alloc_audio_frame(enum AVSampleFormat sample_fmt,
     return frame;
 }
 
+/* 这里执行的操作就是打开编码器和分配一些需要的存储空间 */
 static void open_audio(AVFormatContext *oc, AVCodec *codec, OutputStream *ost, AVDictionary *opt_arg)
 {
     AVCodecContext *c;
@@ -277,6 +288,7 @@ static void open_audio(AVFormatContext *oc, AVCodec *codec, OutputStream *ost, A
 
 /* Prepare a 16 bit dummy audio frame of 'frame_size' samples and
  * 'nb_channels' channels. */
+/* 获取音频帧 */
 static AVFrame *get_audio_frame(OutputStream *ost)
 {
     AVFrame *frame = ost->tmp_frame;
@@ -284,6 +296,7 @@ static AVFrame *get_audio_frame(OutputStream *ost)
     int16_t *q = (int16_t*)frame->data[0];
 
     /* check if we want to generate more frames */
+    /* 使用avframe中的pts以及时基来计算生成帧的时间，视频步进1/25 音频步进1024/44100 */
     if (av_compare_ts(ost->next_pts, ost->enc->time_base,
                       STREAM_DURATION, (AVRational){ 1, 1 }) >= 0)
         return NULL;
@@ -296,15 +309,17 @@ static AVFrame *get_audio_frame(OutputStream *ost)
         ost->tincr += ost->tincr2;
     }
 
+    /* frame.pts从0开始，每次递增nb_samples */
     frame->pts = ost->next_pts;
     ost->next_pts  += frame->nb_samples;
-
+    /* 音频pts自增 */
     return frame;
 }
 
 /*
  * encode one audio frame and send it to the muxer
  * return 1 when encoding is finished, 0 otherwise
+ 写音频
  */
 static int write_audio_frame(AVFormatContext *oc, OutputStream *ost)
 {
@@ -317,7 +332,7 @@ static int write_audio_frame(AVFormatContext *oc, OutputStream *ost)
 
     av_init_packet(&pkt);
     c = ost->enc;
-
+    /* 获取音频帧 */
     frame = get_audio_frame(ost);
 
     if (frame) {
@@ -336,6 +351,7 @@ static int write_audio_frame(AVFormatContext *oc, OutputStream *ost)
             exit(1);
 
         /* convert to destination format */
+        /* 音频重采样 */
         ret = swr_convert(ost->swr_ctx,
                           ost->frame->data, dst_nb_samples,
                           (const uint8_t **)frame->data, frame->nb_samples);
@@ -344,11 +360,13 @@ static int write_audio_frame(AVFormatContext *oc, OutputStream *ost)
             exit(1);
         }
         frame = ost->frame;
-
+        /* 时基转换 从1/采样率 –> 流时基
+         在编码之前，需要将frame.pts从1/sample_rate时基转成编码器时基（一般1/sample_rate与编码时基一致）。
+         */
         frame->pts = av_rescale_q(ost->samples_count, (AVRational){1, c->sample_rate}, c->time_base);
         ost->samples_count += dst_nb_samples;
     }
-
+    /* 编码音频帧 */
     ret = avcodec_encode_audio2(c, &pkt, frame, &got_packet);
     if (ret < 0) {
         fprintf(stderr, "Error encoding audio frame: %s\n", av_err2str(ret));
@@ -393,6 +411,7 @@ static AVFrame *alloc_picture(enum AVPixelFormat pix_fmt, int width, int height)
     return picture;
 }
 
+/* 这里执行的操作就是打开编码器和分配一些需要的存储空间 */
 static void open_video(AVFormatContext *oc, AVCodec *codec, OutputStream *ost, AVDictionary *opt_arg)
 {
     int ret;
@@ -458,17 +477,24 @@ static void fill_yuv_image(AVFrame *pict, int frame_index,
     }
 }
 
+/* 动态生成一帧视频数据frame yuv420格式 */
 static AVFrame *get_video_frame(OutputStream *ost)
 {
     AVCodecContext *c = ost->enc;
 
     /* check if we want to generate more frames */
+    /*
+     比较当前时间是否是否大于设定时间 next_pts*time_base > STREAM_DURATION*1
+     相当于只产生10s的视频
+     */
     if (av_compare_ts(ost->next_pts, c->time_base,
                       STREAM_DURATION, (AVRational){ 1, 1 }) >= 0)
         return NULL;
 
     /* when we pass a frame to the encoder, it may keep a reference to it
-     * internally; make sure we do not overwrite it here */
+     * internally; make sure we do not overwrite it here
+     确保AVFrame是可写的，尽可能避免数据的复制。如果AVFrame不是可写的，将分配新的buffer和复制数据
+     */
     if (av_frame_make_writable(ost->frame) < 0)
         exit(1);
 
@@ -487,22 +513,26 @@ static AVFrame *get_video_frame(OutputStream *ost)
                 exit(1);
             }
         }
+        /* 格式缩放重采样 */
         fill_yuv_image(ost->tmp_frame, ost->next_pts, c->width, c->height);
         sws_scale(ost->sws_ctx, (const uint8_t * const *) ost->tmp_frame->data,
                   ost->tmp_frame->linesize, 0, c->height, ost->frame->data,
                   ost->frame->linesize);
     } else {
+        /* 根据next_pts 参数不一样，动态生成不同画面的frame */
         fill_yuv_image(ost->frame, ost->next_pts, c->width, c->height);
     }
 
     ost->frame->pts = ost->next_pts++;
-
+    
+    /* pts 自增 */
     return ost->frame;
 }
 
 /*
  * encode one video frame and send it to the muxer
  * return 1 when encoding is finished, 0 otherwise
+ * 写视频
  */
 static int write_video_frame(AVFormatContext *oc, OutputStream *ost)
 {
@@ -513,12 +543,14 @@ static int write_video_frame(AVFormatContext *oc, OutputStream *ost)
     AVPacket pkt = { 0 };
 
     c = ost->enc;
-
+    
+    //动态生成一帧视频数据frame yuv420格式
     frame = get_video_frame(ost);
 
     av_init_packet(&pkt);
 
     /* encode the image */
+    /* 将frame数据编码成pkt编码后的数据 */
     ret = avcodec_encode_video2(c, &pkt, frame, &got_packet);
     if (ret < 0) {
         fprintf(stderr, "Error encoding video frame: %s\n", av_err2str(ret));
@@ -582,6 +614,7 @@ int main(int argc, char **argv)
     }
 
     /* allocate the output media context */
+    /* 该函数通常是第一个调用的函数，函数可以初始化一个用于输出的AVFormatContext结构体 */
     avformat_alloc_output_context2(&oc, NULL, NULL, filename);
     if (!oc) {
         printf("Could not deduce output format from file extension: using MPEG.\n");
@@ -626,6 +659,7 @@ int main(int argc, char **argv)
     }
 
     /* Write the stream header, if any. */
+    /* 写入视频头 */
     ret = avformat_write_header(oc, &opt);
     if (ret < 0) {
         fprintf(stderr, "Error occurred when opening output file: %s\n",
@@ -648,9 +682,11 @@ int main(int argc, char **argv)
      * close the CodecContexts open when you wrote the header; otherwise
      * av_write_trailer() may try to use memory that was freed on
      * av_codec_close(). */
+    /* 写入视频尾 */
     av_write_trailer(oc);
 
     /* Close each codec. */
+    /* 释放资源 */
     if (have_video)
         close_stream(oc, &video_st);
     if (have_audio)

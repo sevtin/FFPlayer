@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		E62D2CFF246E3A8D00D056E7 /* muxing.c in Sources */ = {isa = PBXBuildFile; fileRef = E62D2CFE246E3A8D00D056E7 /* muxing.c */; };
 		E6E97DC8246CD90500E6D327 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = E6E97DC7246CD90500E6D327 /* main.m */; };
 		E6E97DD8246CD9DA00E6D327 /* libavfilter.7.57.100.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = E6E97DCF246CD9DA00E6D327 /* libavfilter.7.57.100.dylib */; };
 		E6E97DD9246CD9DA00E6D327 /* libpostproc.55.5.100.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = E6E97DD0246CD9DA00E6D327 /* libpostproc.55.5.100.dylib */; };
@@ -33,6 +34,7 @@
 
 /* Begin PBXFileReference section */
 		E62D2CFD246E378800D056E7 /* Sandwich.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = Sandwich.mp4; sourceTree = "<group>"; };
+		E62D2CFE246E3A8D00D056E7 /* muxing.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = muxing.c; path = examples/muxing.c; sourceTree = SOURCE_ROOT; };
 		E6E97DC4246CD90500E6D327 /* FFPlayer */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = FFPlayer; sourceTree = BUILT_PRODUCTS_DIR; };
 		E6E97DC7246CD90500E6D327 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		E6E97DCF246CD9DA00E6D327 /* libavfilter.7.57.100.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libavfilter.7.57.100.dylib; path = ../../../../../usr/local/Cellar/ffmpeg/4.2.2_3/lib/libavfilter.7.57.100.dylib; sourceTree = "<group>"; };
@@ -88,6 +90,7 @@
 			children = (
 				E62D2CFD246E378800D056E7 /* Sandwich.mp4 */,
 				E6E97DC7246CD90500E6D327 /* main.m */,
+				E62D2CFE246E3A8D00D056E7 /* muxing.c */,
 			);
 			path = FFPlayer;
 			sourceTree = "<group>";
@@ -166,6 +169,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E6E97DC8246CD90500E6D327 /* main.m in Sources */,
+				E62D2CFF246E3A8D00D056E7 /* muxing.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
