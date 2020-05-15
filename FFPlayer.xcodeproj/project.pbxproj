@@ -17,7 +17,6 @@
 		E6E97DDE246CD9DA00E6D327 /* libavdevice.58.8.100.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = E6E97DD5246CD9DA00E6D327 /* libavdevice.58.8.100.dylib */; };
 		E6E97DDF246CD9DA00E6D327 /* libswscale.5.5.100.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = E6E97DD6246CD9DA00E6D327 /* libswscale.5.5.100.dylib */; };
 		E6E97DE0246CD9DA00E6D327 /* libavformat.58.29.100.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = E6E97DD7246CD9DA00E6D327 /* libavformat.58.29.100.dylib */; };
-		E6E97DE2246CDA1C00E6D327 /* decode_video.c in Sources */ = {isa = PBXBuildFile; fileRef = E6E97DE1246CDA1C00E6D327 /* decode_video.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -44,7 +43,6 @@
 		E6E97DD5246CD9DA00E6D327 /* libavdevice.58.8.100.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libavdevice.58.8.100.dylib; path = ../../../../../usr/local/Cellar/ffmpeg/4.2.2_3/lib/libavdevice.58.8.100.dylib; sourceTree = "<group>"; };
 		E6E97DD6246CD9DA00E6D327 /* libswscale.5.5.100.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libswscale.5.5.100.dylib; path = ../../../../../usr/local/Cellar/ffmpeg/4.2.2_3/lib/libswscale.5.5.100.dylib; sourceTree = "<group>"; };
 		E6E97DD7246CD9DA00E6D327 /* libavformat.58.29.100.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libavformat.58.29.100.dylib; path = ../../../../../usr/local/Cellar/ffmpeg/4.2.2_3/lib/libavformat.58.29.100.dylib; sourceTree = "<group>"; };
-		E6E97DE1246CDA1C00E6D327 /* decode_video.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = decode_video.c; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -88,7 +86,6 @@
 			isa = PBXGroup;
 			children = (
 				E6E97DC7246CD90500E6D327 /* main.m */,
-				E6E97DE1246CDA1C00E6D327 /* decode_video.c */,
 			);
 			path = FFPlayer;
 			sourceTree = "<group>";
@@ -167,7 +164,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				E6E97DC8246CD90500E6D327 /* main.m in Sources */,
-				E6E97DE2246CDA1C00E6D327 /* decode_video.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
