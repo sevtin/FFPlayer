@@ -207,9 +207,9 @@ static AVFrame *alloc_audio_frame(enum AVSampleFormat sample_fmt,
     }
 
     frame->format = sample_fmt;
-    frame->channel_layout = channel_layout;
-    frame->sample_rate = sample_rate;
-    frame->nb_samples = nb_samples;
+    frame->channel_layout = channel_layout;//声道数
+    frame->sample_rate = sample_rate;//采样率
+    frame->nb_samples = nb_samples;//音频的一个AVFrame中可能包含多个音频帧，在此标记包含了几个
 
     if (nb_samples) {
         ret = av_frame_get_buffer(frame, 0);
@@ -587,12 +587,16 @@ int main(int argc, char **argv)
 {
     OutputStream video_st = { 0 }, audio_st = { 0 };
     const char *filename;
+    /* 输出文件格式 */
     AVOutputFormat *fmt;
+    /* 描述了一个媒体文件或媒体流的构成和基本信息 */
     AVFormatContext *oc;
+    /* 音频、视屏编解码器 */
     AVCodec *audio_codec, *video_codec;
     int ret;
     int have_video = 0, have_audio = 0;
     int encode_video = 0, encode_audio = 0;
+    /* 用来配置参数 */
     AVDictionary *opt = NULL;
     int i;
 
@@ -606,9 +610,10 @@ int main(int argc, char **argv)
                "\n", argv[0]);
         return 1;
     }
-
+    //文件名
     filename = argv[1];
     for (i = 2; i+1 < argc; i+=2) {
+        /* strcmp函数是string compare(字符串比较)的缩写,strcmp(str1,str2)，若str1=str2，则返回零 */
         if (!strcmp(argv[i], "-flags") || !strcmp(argv[i], "-fflags"))
             av_dict_set(&opt, argv[i]+1, argv[i+1], 0);
     }
@@ -617,22 +622,28 @@ int main(int argc, char **argv)
     /* 该函数通常是第一个调用的函数，函数可以初始化一个用于输出的AVFormatContext结构体 */
     avformat_alloc_output_context2(&oc, NULL, NULL, filename);
     if (!oc) {
+        /* 无法从文件扩展名推断输出格式：则使用MPEG */
         printf("Could not deduce output format from file extension: using MPEG.\n");
         avformat_alloc_output_context2(&oc, NULL, "mpeg", filename);
     }
     if (!oc)
         return 1;
-
+    
+    /* 作为输出容器时 struct AVOutputFormat *oformat; 不能为空, 程序把编码好的音视频包写入到输出容器中 */
     fmt = oc->oformat;
 
     /* Add the audio and video streams using the default format codecs
      * and initialize the codecs. */
+    /* 使用默认格式的编解码器添加音频和视频流 并初始化编解码器。 */
+    /* 输出视屏编码ID != NONE */
     if (fmt->video_codec != AV_CODEC_ID_NONE) {
+        /* 添加视频流 */
         add_stream(&video_st, oc, &video_codec, fmt->video_codec);
         have_video = 1;
         encode_video = 1;
     }
     if (fmt->audio_codec != AV_CODEC_ID_NONE) {
+        /* 添加音频流 */
         add_stream(&audio_st, oc, &audio_codec, fmt->audio_codec);
         have_audio = 1;
         encode_audio = 1;
@@ -640,15 +651,18 @@ int main(int argc, char **argv)
 
     /* Now that all the parameters are set, we can open the audio and
      * video codecs and allocate the necessary encode buffers. */
+    /* 现在已经设置了所有参数，我们可以打开音频并
+     视频编解码器，并分配必要的编码缓冲区。*/
     if (have_video)
         open_video(oc, video_codec, &video_st, opt);
 
     if (have_audio)
         open_audio(oc, audio_codec, &audio_st, opt);
-
+    /* 输出格式化上下文 */
     av_dump_format(oc, 0, filename, 1);
 
     /* open the output file, if needed */
+    /* 打开输出文件（如果需要）*/
     if (!(fmt->flags & AVFMT_NOFILE)) {
         ret = avio_open(&oc->pb, filename, AVIO_FLAG_WRITE);
         if (ret < 0) {
@@ -669,6 +683,7 @@ int main(int argc, char **argv)
 
     while (encode_video || encode_audio) {
         /* select the stream to encode */
+        /* 选择要编码的流 */
         if (encode_video &&
             (!encode_audio || av_compare_ts(video_st.next_pts, video_st.enc->time_base,
                                             audio_st.next_pts, audio_st.enc->time_base) <= 0)) {
@@ -682,6 +697,12 @@ int main(int argc, char **argv)
      * close the CodecContexts open when you wrote the header; otherwise
      * av_write_trailer() may try to use memory that was freed on
      * av_codec_close(). */
+    /*
+     * 编写预告片（如果有）。预告片必须在您之前写好
+     * 关闭编写标头时打开的CodecContext；除此以外
+     * av_write_trailer（）可能会尝试使用已释放的内存
+     * av_codec_close（）。
+     */
     /* 写入视频尾 */
     av_write_trailer(oc);
 
